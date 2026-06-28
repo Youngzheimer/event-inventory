@@ -31,26 +31,51 @@ export function getApplicableStages(item: Item, stages: CheckStage[]): CheckStag
   return stages.filter((s) => isStageApplicable(item, s))
 }
 
+export function getPreviousStage(
+  item: Item,
+  stages: CheckStage[],
+  currentStageId: string
+): CheckStage | null {
+  const applicable = getApplicableStages(item, stages)
+  const idx = applicable.findIndex((s) => s.id === currentStageId)
+  if (idx <= 0) return null
+  return applicable[idx - 1]
+}
+
+export function getPreviousStageMissing(
+  item: Item,
+  stages: CheckStage[],
+  checks: ItemCheck[],
+  currentStageId: string
+): { stage: CheckStage; check: ItemCheck } | null {
+  const prev = getPreviousStage(item, stages, currentStageId)
+  if (!prev) return null
+  const check = checks.find((c) => c.stageId === prev.id)
+  if (!check || check.missingCount <= 0) return null
+  return { stage: prev, check }
+}
+
 export async function toggleItemCheck(
   item: Item,
   stage: CheckStage,
   checked: boolean
 ): Promise<ItemCheck> {
-  const existing = await api.put<ItemCheck>(`/items/${item.id}/checks/${stage.id}`, { checked })
-  return existing
+  return api.put<ItemCheck>(`/items/${item.id}/checks/${stage.id}`, {
+    checked,
+    ...(checked ? { missingCount: 0, missingReason: '' } : {}),
+  })
 }
 
 export async function updateItemCheckMissing(
   itemId: string,
   stageId: string,
   missingCount: number,
-  missingReason: string,
-  checked?: boolean
+  missingReason: string
 ): Promise<ItemCheck> {
   return api.put<ItemCheck>(`/items/${itemId}/checks/${stageId}`, {
     missingCount,
     missingReason,
-    checked,
+    ...(missingCount > 0 ? { checked: false } : {}),
   })
 }
 

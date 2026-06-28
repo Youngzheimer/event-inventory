@@ -50,7 +50,7 @@ export function ItemCard({
 
   const checkedCount = applicableStages.filter((s) => checks.find((c) => c.stageId === s.id)?.checked).length
   const allChecked = applicableStages.length > 0 && checkedCount === applicableStages.length
-  const hasMissing = checks.some((c) => c.missingCount > 0)
+  const hasMissing = checks.some((c) => !c.checked && c.missingCount > 0)
 
   const focusMode = viewMode === 'focus' && activeStageId && activeStage
 
@@ -58,7 +58,7 @@ export function ItemCard({
     ? activeApplicable
       ? activeChecked
         ? 'border-success/30 bg-success/5'
-        : (activeCheck?.missingCount ?? 0) > 0
+        : !activeChecked && (activeCheck?.missingCount ?? 0) > 0
           ? 'border-warning/30 bg-warning/5'
           : 'border-brand-500/30 bg-brand-500/5'
       : 'border-slate-700/50 bg-surface-raised opacity-60'
@@ -115,6 +115,7 @@ export function ItemCard({
             <CurrentStageCheck
               item={item}
               stage={activeStage}
+              stages={stages}
               checks={checks}
               onUpdate={onUpdate}
               large

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Item, CheckStage, ItemCheck } from '../types'
 import { getApplicableStages } from '../services/itemService'
 import { toggleItemCheck, updateItemCheckMissing } from '../services/itemService'
+import { PreviousStageMissing } from './PreviousStageMissing'
 import { vibrate, cn } from '../lib/utils'
 
 interface CheckStagePanelProps {
@@ -25,11 +26,19 @@ export function CheckStagePanel({ item, stages, checks, onUpdate, compact }: Che
     const newChecked = !existing?.checked
     await toggleItemCheck(item, stage, newChecked)
     vibrate(newChecked ? 15 : 8)
+    if (newChecked) setExpandedStage(null)
     onUpdate()
   }
 
   const handleMissingUpdate = async (stageId: string, count: number, reason: string) => {
     await updateItemCheckMissing(item.id, stageId, count, reason)
+    if (count > 0) setExpandedStage(stageId)
+    onUpdate()
+  }
+
+  const openMissingReport = async (stage: CheckStage) => {
+    await toggleItemCheck(item, stage, false)
+    setExpandedStage(stage.id)
     onUpdate()
   }
 
@@ -38,16 +47,22 @@ export function CheckStagePanel({ item, stages, checks, onUpdate, compact }: Che
       {applicable.map((stage) => {
         const check = checks.find((c) => c.stageId === stage.id)
         const isChecked = check?.checked ?? false
-        const hasMissing = (check?.missingCount ?? 0) > 0
+        const hasMissing = !isChecked && (check?.missingCount ?? 0) > 0
         const isExpanded = expandedStage === stage.id
 
         return (
           <div key={stage.id} className="rounded-xl bg-surface/60 overflow-hidden">
+            <PreviousStageMissing
+              item={item}
+              stages={stages}
+              checks={checks}
+              currentStageId={stage.id}
+            />
             <div
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 transition-colors',
                 isChecked && 'bg-success/10',
-                hasMissing && !isChecked && 'bg-warning/10'
+                hasMissing && 'bg-warning/10'
               )}
             >
               <button
@@ -58,7 +73,7 @@ export function CheckStagePanel({ item, stages, checks, onUpdate, compact }: Che
                   className={cn(
                     'w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all',
                     isChecked ? 'bg-success border-success' : 'border-slate-500',
-                    hasMissing && !isChecked && 'border-warning'
+                    hasMissing && 'border-warning bg-warning/10'
                   )}
                 >
                   {isChecked && (
@@ -66,7 +81,7 @@ export function CheckStagePanel({ item, stages, checks, onUpdate, compact }: Che
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   )}
-                  {hasMissing && !isChecked && (
+                  {hasMissing && (
                     <span className="text-warning text-xs font-bold">!</span>
                   )}
                 </div>
@@ -77,18 +92,28 @@ export function CheckStagePanel({ item, stages, checks, onUpdate, compact }: Che
                   <span className="text-xs text-warning font-medium shrink-0">{check?.missingCount}개 부족</span>
                 )}
               </button>
-              <button
-                onClick={() => setExpandedStage(isExpanded ? null : stage.id)}
-                className="p-1.5 rounded-lg hover:bg-surface-overlay text-slate-400 touch-target shrink-0"
-                aria-label="부족 상세"
-              >
-                <svg className={cn('w-4 h-4 transition-transform', isExpanded && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+              {!isChecked && (
+                <button
+                  onClick={() => setExpandedStage(isExpanded ? null : stage.id)}
+                  className="p-1.5 rounded-lg hover:bg-surface-overlay text-slate-400 touch-target shrink-0"
+                  aria-label="부족 상세"
+                >
+                  <svg className={cn('w-4 h-4 transition-transform', isExpanded && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              )}
+              {isChecked && (
+                <button
+                  onClick={() => openMissingReport(stage)}
+                  className="px-2 py-1 rounded-lg text-xs text-warning hover:bg-warning/10 shrink-0"
+                >
+                  부족 신고
+                </button>
+              )}
             </div>
 
-            {isExpanded && (
+            {isExpanded && !isChecked && (
               <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-700/30 animate-slide-up">
                 <div className="flex items-center gap-3">
                   <label className="text-xs text-slate-400 shrink-0">부족 수량</label>

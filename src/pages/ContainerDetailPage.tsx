@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router-dom'
 import { useEventSnapshot } from '../hooks/useEventSnapshot'
 import { updateContainer } from '../services/containerService'
@@ -19,7 +20,7 @@ export function ContainerDetailPage() {
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState('')
-  const [barcodeReady, setBarcodeReady] = useState(false)
+  const [showLabel, setShowLabel] = useState(false)
   const [printing, setPrinting] = useState(false)
   const printPendingRef = useRef(false)
 
@@ -34,35 +35,35 @@ export function ContainerDetailPage() {
   const origins = data?.origins ?? []
   const checks = data?.checks ?? []
   const allContainers = data?.containers ?? []
+  const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0)
 
   useEffect(() => {
-    setBarcodeReady(false)
     printPendingRef.current = false
-    setPrinting(false)
   }, [containerId, container?.code])
 
+  const finishPrint = useCallback(() => {
+    document.body.classList.remove('printing-label')
+    setPrinting(false)
+    printPendingRef.current = false
+  }, [])
+
+  useEffect(() => {
+    const onAfterPrint = () => finishPrint()
+    window.addEventListener('afterprint', onAfterPrint)
+    return () => window.removeEventListener('afterprint', onAfterPrint)
+  }, [finishPrint])
+
   const handleBarcodeReady = useCallback(() => {
-    setBarcodeReady(true)
     if (printPendingRef.current) {
       printPendingRef.current = false
-      requestAnimationFrame(() => {
-        window.print()
-        setPrinting(false)
-      })
+      document.body.classList.add('printing-label')
+      requestAnimationFrame(() => window.print())
     }
   }, [])
 
   const handlePrint = () => {
-    if (barcodeReady) {
-      setPrinting(true)
-      requestAnimationFrame(() => {
-        window.print()
-        setPrinting(false)
-      })
-    } else {
-      printPendingRef.current = true
-      setPrinting(true)
-    }
+    printPendingRef.current = true
+    setPrinting(true)
   }
 
   if (loading && !data) {
@@ -108,9 +109,18 @@ export function ContainerDetailPage() {
     refresh()
   }
 
+  const labelContent = event ? (
+    <BarcodeLabel
+      container={container}
+      eventName={event.name}
+      size="lg"
+      onReady={handleBarcodeReady}
+    />
+  ) : null
+
   return (
     <div className="safe-top container-detail-page">
-      <header className="px-5 pt-6 pb-4 screen-only">
+      <header className="px-5 pt-6 pb-4">
         <Link to={`/events/${eventId}/containers`} className="text-sm text-slate-400 hover:text-slate-300 mb-3 inline-block">
           ← 상자 목록
         </Link>
@@ -139,34 +149,35 @@ export function ContainerDetailPage() {
         )}
       </header>
 
-      <div className="px-5 mb-4 print-label-section">
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 screen-only">
-          라벨
-        </h2>
-        <div className="rounded-2xl overflow-hidden border border-slate-700/50 shadow-lg">
-          {event && (
-            <BarcodeLabel
-              container={container}
-              eventName={event.name}
-              size="lg"
-              onReady={handleBarcodeReady}
-            />
+      <div className="px-5 mb-4">
+        <div className="rounded-2xl bg-surface-raised border border-slate-700/50 p-4">
+          <div className="grid grid-cols-2 gap-4 text-center">
+            <div>
+              <p className="text-2xl font-bold">{items.length}</p>
+              <p className="text-xs text-slate-400 mt-0.5">물품 종류</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{totalQuantity}</p>
+              <p className="text-xs text-slate-400 mt-0.5">총 수량</p>
+            </div>
+          </div>
+          {container.description && (
+            <p className="text-sm text-slate-400 mt-3 pt-3 border-t border-slate-700/30">{container.description}</p>
           )}
         </div>
       </div>
 
-      <div className="px-5 flex gap-2 mb-4 screen-only">
+      <div className="px-5 flex gap-2 mb-4">
         <Button
           variant="secondary"
           size="sm"
           className="flex-1"
-          onClick={handlePrint}
-          disabled={printing}
+          onClick={() => setShowLabel(!showLabel)}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
           </svg>
-          {printing ? '인쇄 준비 중...' : '라벨 인쇄'}
+          {showLabel ? '라벨 숨기기' : '라벨 보기'}
         </Button>
         <Button size="sm" className="flex-1" onClick={() => setShowForm(true)}>
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -176,7 +187,28 @@ export function ContainerDetailPage() {
         </Button>
       </div>
 
-      <div className="px-5 pb-6 space-y-3 screen-only">
+      {showLabel && (
+        <div className="px-5 mb-4">
+          <div className="rounded-2xl overflow-hidden border border-slate-700/50 shadow-lg">
+            {labelContent}
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            fullWidth
+            className="mt-3"
+            onClick={handlePrint}
+            disabled={printing}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            {printing ? '인쇄 준비 중...' : '라벨 인쇄'}
+          </Button>
+        </div>
+      )}
+
+      <div className="px-5 pb-6 space-y-3">
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
           포함 물품 ({items.length})
         </h2>
@@ -211,26 +243,12 @@ export function ContainerDetailPage() {
         ))}
       </div>
 
-      <style>{`
-        @media print {
-          body { background: white !important; }
-          nav, .screen-only { display: none !important; }
-          .container-detail-page { padding: 0 !important; }
-          .print-label-section {
-            display: flex !important;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .print-label-section > div {
-            border: none !important;
-            box-shadow: none !important;
-            border-radius: 0 !important;
-          }
-        }
-      `}</style>
+      {printing && createPortal(
+        <div className="print-label-portal">
+          {labelContent}
+        </div>,
+        document.body
+      )}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title="물품 추가">
         <ItemForm

@@ -15,7 +15,7 @@ export function StageHistoryDots({ stages, checks, activeStageId }: StageHistory
       {stages.map((stage, i) => {
         const check = checks.find((c) => c.stageId === stage.id)
         const isChecked = check?.checked ?? false
-        const hasMissing = (check?.missingCount ?? 0) > 0
+        const hasMissing = !isChecked && (check?.missingCount ?? 0) > 0
         const isCurrent = stage.id === activeStageId
         const isFuture = i > activeIdx
 

@@ -1,21 +1,23 @@
 import { useState } from 'react'
 import type { Item, CheckStage, ItemCheck } from '../types'
 import { toggleItemCheck, updateItemCheckMissing, isStageApplicable } from '../services/itemService'
+import { PreviousStageMissing } from './PreviousStageMissing'
 import { vibrate, cn } from '../lib/utils'
 
 interface CurrentStageCheckProps {
   item: Item
   stage: CheckStage
+  stages: CheckStage[]
   checks: ItemCheck[]
   onUpdate: () => void
   large?: boolean
 }
 
-export function CurrentStageCheck({ item, stage, checks, onUpdate, large }: CurrentStageCheckProps) {
+export function CurrentStageCheck({ item, stage, stages, checks, onUpdate, large }: CurrentStageCheckProps) {
   const [expanded, setExpanded] = useState(false)
   const check = checks.find((c) => c.stageId === stage.id)
   const isChecked = check?.checked ?? false
-  const hasMissing = (check?.missingCount ?? 0) > 0
+  const hasMissing = !isChecked && (check?.missingCount ?? 0) > 0
 
   if (!isStageApplicable(item, stage)) {
     return (
@@ -27,11 +29,19 @@ export function CurrentStageCheck({ item, stage, checks, onUpdate, large }: Curr
     const newChecked = !isChecked
     await toggleItemCheck(item, stage, newChecked)
     vibrate(newChecked ? 20 : 10)
+    if (newChecked) setExpanded(false)
     onUpdate()
   }
 
   const handleMissingUpdate = async (count: number, reason: string) => {
     await updateItemCheckMissing(item.id, stage.id, count, reason)
+    if (count > 0) setExpanded(true)
+    onUpdate()
+  }
+
+  const openMissingReport = async () => {
+    await toggleItemCheck(item, stage, false)
+    setExpanded(true)
     onUpdate()
   }
 
@@ -39,8 +49,10 @@ export function CurrentStageCheck({ item, stage, checks, onUpdate, large }: Curr
     <div className={cn(
       'rounded-xl overflow-hidden',
       isChecked ? 'bg-success/15 border border-success/30' : 'bg-brand-500/10 border border-brand-500/25',
-      hasMissing && !isChecked && 'bg-warning/10 border-warning/30'
+      hasMissing && 'bg-warning/10 border-warning/30'
     )}>
+      <PreviousStageMissing item={item} stages={stages} checks={checks} currentStageId={stage.id} />
+
       <button
         onClick={handleToggle}
         className={cn(
@@ -53,7 +65,7 @@ export function CurrentStageCheck({ item, stage, checks, onUpdate, large }: Curr
             'rounded-xl border-2 flex items-center justify-center shrink-0 transition-all',
             large ? 'w-10 h-10' : 'w-8 h-8',
             isChecked ? 'bg-success border-success' : 'border-slate-400',
-            hasMissing && !isChecked && 'border-warning'
+            hasMissing && 'border-warning bg-warning/10'
           )}
         >
           {isChecked && (
@@ -61,7 +73,7 @@ export function CurrentStageCheck({ item, stage, checks, onUpdate, large }: Curr
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           )}
-          {hasMissing && !isChecked && (
+          {hasMissing && (
             <span className="text-warning font-bold">!</span>
           )}
         </div>
@@ -73,18 +85,28 @@ export function CurrentStageCheck({ item, stage, checks, onUpdate, large }: Curr
             <p className="text-xs text-warning mt-0.5">{check?.missingCount}개 부족</p>
           )}
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
-          className="p-2 rounded-lg text-slate-400 hover:bg-surface-overlay shrink-0"
-          aria-label="부족 상세"
-        >
-          <svg className={cn('w-4 h-4 transition-transform', expanded && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+        {!isChecked && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
+            className="p-2 rounded-lg text-slate-400 hover:bg-surface-overlay shrink-0"
+            aria-label="부족 상세"
+          >
+            <svg className={cn('w-4 h-4 transition-transform', expanded && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        )}
+        {isChecked && (
+          <button
+            onClick={(e) => { e.stopPropagation(); openMissingReport() }}
+            className="px-2 py-1 rounded-lg text-xs text-warning hover:bg-warning/10 shrink-0"
+          >
+            부족 신고
+          </button>
+        )}
       </button>
 
-      {expanded && (
+      {expanded && !isChecked && (
         <div className="px-4 pb-3 space-y-2 border-t border-slate-700/20 animate-slide-up">
           <div className="flex items-center gap-3 pt-2">
             <span className="text-xs text-slate-400 shrink-0">부족 수량</span>

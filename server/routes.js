@@ -206,22 +206,32 @@ export function createRouter(db) {
     const now = Date.now()
 
     if (existing) {
-      const newChecked = checked !== undefined ? (checked ? 1 : 0) : existing.checked
-      const newCheckedAt = checked !== undefined ? (checked ? now : null) : existing.checked_at
+      let newMissing = missingCount !== undefined ? missingCount : existing.missing_count
+      let newReason = missingReason !== undefined ? missingReason : existing.missing_reason
+      let newChecked = checked !== undefined ? (checked ? 1 : 0) : existing.checked
+      let newCheckedAt = checked !== undefined ? (checked ? now : null) : existing.checked_at
+
+      if (checked === true) {
+        newMissing = 0
+        newReason = ''
+        newChecked = 1
+        newCheckedAt = now
+      }
+      if (missingCount !== undefined && missingCount > 0) {
+        newChecked = 0
+        newCheckedAt = null
+      }
+
       db.prepare(`UPDATE item_checks SET checked=?, missing_count=?, missing_reason=?, checked_at=? WHERE id=?`)
-        .run(
-          newChecked,
-          missingCount ?? existing.missing_count,
-          missingReason ?? existing.missing_reason,
-          newCheckedAt,
-          id
-        )
+        .run(newChecked, newMissing, newReason, newCheckedAt, id)
     } else {
+      const initMissing = missingCount ?? 0
+      const initChecked = initMissing > 0 ? 0 : (checked ? 1 : 0)
       db.prepare(`INSERT INTO item_checks (id, item_id, stage_id, checked, missing_count, missing_reason, checked_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
         id, req.params.itemId, req.params.stageId,
-        checked ? 1 : 0, missingCount ?? 0, missingReason ?? '',
-        checked ? now : null
+        initChecked, initMissing, missingReason ?? '',
+        initChecked ? now : null
       )
     }
 

@@ -13,6 +13,7 @@ interface ItemFormProps {
   containers: Container[]
   initial?: Partial<Item>
   defaultContainerId?: string
+  defaultOriginId?: string
   onSubmit: (data: {
     name: string
     quantity: number
@@ -24,11 +25,11 @@ interface ItemFormProps {
   onCancel: () => void
 }
 
-export function ItemForm({ tags, origins, containers, initial, defaultContainerId, onSubmit, onCancel }: ItemFormProps) {
+export function ItemForm({ tags, origins, containers, initial, defaultContainerId, defaultOriginId, onSubmit, onCancel }: ItemFormProps) {
   const [name, setName] = useState(initial?.name ?? '')
   const [quantity, setQuantity] = useState(initial?.quantity ?? 1)
   const [notes, setNotes] = useState(initial?.notes ?? '')
-  const [originId, setOriginId] = useState(initial?.originId ?? '')
+  const [originId, setOriginId] = useState(initial?.originId ?? defaultOriginId ?? '')
   const [tagIds, setTagIds] = useState<string[]>(initial?.tagIds ?? [])
   const [containerId, setContainerId] = useState(initial?.containerId ?? defaultContainerId ?? '')
   const [loading, setLoading] = useState(false)

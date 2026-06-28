@@ -6,6 +6,7 @@ import { updateContainer } from '../services/containerService'
 import { createItem, updateItem, deleteItem } from '../services/itemService'
 import { ItemCard } from '../components/ItemCard'
 import { ItemForm } from '../components/ItemForm'
+import { AddExistingItemsModal } from '../components/AddExistingItemsModal'
 import { BarcodeLabel } from '../components/BarcodeLabel'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -17,6 +18,7 @@ export function ContainerDetailPage() {
   const { eventId, containerId } = useParams<{ eventId: string; containerId: string }>()
   const { data, loading, refresh } = useEventSnapshot(eventId)
   const [showForm, setShowForm] = useState(false)
+  const [showExisting, setShowExisting] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState('')
@@ -179,11 +181,22 @@ export function ContainerDetailPage() {
           </svg>
           {showLabel ? '라벨 숨기기' : '라벨 보기'}
         </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
+          onClick={() => setShowExisting(true)}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          기존 물품
+        </Button>
         <Button size="sm" className="flex-1" onClick={() => setShowForm(true)}>
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
-          물품 추가
+          새 물품
         </Button>
       </div>
 
@@ -249,6 +262,17 @@ export function ContainerDetailPage() {
         </div>,
         document.body
       )}
+
+      <AddExistingItemsModal
+        open={showExisting}
+        onClose={() => setShowExisting(false)}
+        eventId={eventId}
+        currentContainerId={container.id}
+        items={data?.items ?? []}
+        origins={origins}
+        containers={allContainers}
+        onAdded={refresh}
+      />
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title="물품 추가">
         <ItemForm

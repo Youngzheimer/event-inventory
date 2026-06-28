@@ -160,6 +160,7 @@ export function ItemsPage() {
           tags={tags}
           origins={origins}
           containers={containers}
+          defaultOriginId={originFilter ?? undefined}
           onSubmit={handleCreate}
           onCancel={() => setShowForm(false)}
         />
